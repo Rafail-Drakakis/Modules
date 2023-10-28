@@ -1,0 +1,8 @@
+pillow
+PyPDF2
+pdf2image
+pdf2docx
+tempfile
+pandas
+tabula
+openpyxl
