@@ -1,8 +1,6 @@
 #image_module.py
-
 import os
 import PIL
-from PIL import Image
 
 def mirror_image(input_path, direction, output_dir=None, output_format='png'):
     if not os.path.isfile(input_path):
@@ -31,26 +29,13 @@ def mirror_image(input_path, direction, output_dir=None, output_format='png'):
 
 def convert_image(input_path, output_path):
     try:
-        # Open the image file
-        image = Image.open(input_path)
-
-        # Convert the image to the RGB mode
-        image = image.convert("RGB")
-
-        # Create a temporary path to save the image in PNG format
-        temp_path = "temp.png"
-
-        # Save the image in PNG format
-        image.save(temp_path, "PNG")
-
-        # Load the temporary image
-        temp_image = Image.open(temp_path)
-
-        # Save the temporary image in the desired output format with specified quality
-        temp_image.save(output_path, quality=95)
-
-        # Remove the temporary image file
-        os.remove(temp_path)
+        image = PIL.Image.open(input_path) # Open the image file
+        image = image.convert("RGB") # Convert the image to the RGB mode
+        temp_path = "temp.png" # Create a temporary path to save the image in PNG format
+        image.save(temp_path, "PNG") # Save the image in PNG format
+        temp_image = PIL.Image.open(temp_path) # Load the temporary image
+        temp_image.save(output_path, quality=95) # Save the temporary image in the desired output format with specified quality
+        os.remove(temp_path) # Remove the temporary image file
     except FileNotFoundError:
         print("Input file not found.")
     except Exception as e:
@@ -58,7 +43,6 @@ def convert_image(input_path, output_path):
 
 def images_to_pdf(images, pdf_name):
     try:
-        # create a new pdf file
         pdf_images = []
         for image in images:
             img = PIL.Image.open(image)
