@@ -15,24 +15,62 @@ def pdf_to_excel(input_pdf_path):
     # Define output Excel file path
     output_excel_path = os.path.splitext(input_pdf_path)[0] + ".xlsx"
 
-    # Create temporary Excel file paths
-    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
-        temp_excel_path = temp_file.name
-    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as merged_file:
-        merged_excel_path = merged_file.name
+    # Create a temporary directory for storing temporary CSV files
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_csv_files = []
 
-    try:
-        # Convert PDF to Excel
-        pdf_data_frames = tabula.read_pdf(input_pdf_path, pages='all')
-        with pd.ExcelWriter(temp_excel_path, engine='openpyxl') as excel_writer:
-            for i, df in enumerate(pdf_data_frames):
-                df.to_excel(excel_writer, sheet_name=f"Sheet{i + 1}", index=False)
-        dfs = pd.read_excel(temp_excel_path, merged_excel_path=None)
-        merged_data_frame = pd.concat(dfs.values(), ignore_index=True)
+        # Convert each page of the PDF to a separate CSV file
+        pdf_reader = PyPDF2.PdfReader(input_pdf_path)
+        num_pages = len(pdf_reader.pages)
+
+        for page_num in range(num_pages):
+            temp_csv_file = os.path.join(temp_dir, f"Page{page_num + 1}.csv")
+            temp_csv_files.append(temp_csv_file)
+
+            try:
+                tabula.convert_into(input_pdf_path, temp_csv_file, output_format="csv", pages=page_num + 1)
+            except Exception as e:
+                print(f"An error occurred while converting page {page_num + 1} to CSV: {e}")
+
+        # Merge all the separate CSV files into one DataFrame
+        dfs = []
+        for temp_csv_file in temp_csv_files:
+            df = pd.read_csv(temp_csv_file)
+            dfs.append(df)
+
+        # Concatenate all DataFrames into a single DataFrame, skipping the title of every page after the first page
+        merged_data_frame = dfs[0]  # Initialize with the first page
+        for df in dfs[1:]:  # Skip the first page's title
+            merged_data_frame = pd.concat([merged_data_frame, df], ignore_index=True)
+
+        # Save the merged DataFrame to Excel
         merged_data_frame.to_excel(output_excel_path, index=False)
-        os.replace(merged_excel_path, output_excel_path)
 
-        # Check if user wants to shift empty cells
+        # Load the workbook and select the active worksheet
+        workbook = openpyxl.load_workbook(output_excel_path)
+        sheet = workbook.active
+
+        # Iterate through columns
+        for column in sheet.columns:
+            max_length = 0
+            column_letter = openpyxl.utils.get_column_letter(column[0].column)
+
+            # Find the maximum length in each column
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(cell.value)
+                except:
+                    pass
+
+            # Adjust the column width
+            adjusted_width = (max_length + 3)
+            sheet.column_dimensions[column_letter].width = adjusted_width
+
+        # Save the workbook
+        workbook.save(output_excel_path)
+        
+        # Check if the user wants to shift empty cells
         option = input("Do you want to shift empty cells? (yes/no) ")
         if option == "yes":
             excel_workbook = openpyxl.load_workbook(output_excel_path)
@@ -51,16 +89,8 @@ def pdf_to_excel(input_pdf_path):
                                 empty_cell_list.append(current_cell)
                                 break
             excel_workbook.save(output_excel_path)
-    except FileNotFoundError as e:
-        print(f"Error: File not found. {e}")
-    except Exception as e:
-        print(f"An error occurred: {e}")
 
-    finally:
-        # Remove temporary files
-        os.remove(temp_excel_path)
-        if os.path.exists(merged_excel_path):
-            os.remove(merged_excel_path)
+        print(f"PDF converted to Excel: {output_excel_path}")
 
 def split_pdf(filename, page_ranges, output_filename):
     try:
