@@ -1,12 +1,11 @@
 #main.py
 import sub_menu
 
-def menu():
+if __name__ == "__main__":
     try:
         choice = int(input("1. Mirror Image\n2. Convert Image to another image format\n3. Convert Images to PDF\n4. Merge PDF Files\n5. Convert PDF to Word \n6. Convert PDF to Images\n7. Split PDF\n8. Convert PDF to Excel\nEnter your choice: "))
         if choice not in [1, 2, 3, 4, 5, 6, 7, 8]:
             print("Enter a number from 1 to 8")
-            exit()
 
         elif choice == 1:
             sub_menu.mirror_image_menu()
@@ -26,7 +25,3 @@ def menu():
             sub_menu.convert_pdf_to_excel_menu()
     except ValueError:
         print("Enter an integer")
-        exit(0)
-
-if __name__ == "__main__":
-    menu()
