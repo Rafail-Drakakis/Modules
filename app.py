@@ -1,14 +1,7 @@
-import os
+import os, tempfile, glob, pdf2image, pdf2docx, PyPDF2, tabula, openpyxl, warnings ,PIL
+from flask import Flask, render_template_string, request, send_file
+from werkzeug.utils import secure_filename
 import pandas as pd
-import glob
-import pdf2image
-import pdf2docx
-import PyPDF2
-import tempfile
-import tabula
-import openpyxl
-import warnings
-import PIL
 
 def pdf_to_excel(input_pdf_path):
     # Define output Excel file path
@@ -311,3 +304,96 @@ def convert_pdf_to_excel_menu():
         input_pdf_path = input("Enter the input PDF path: ")
 
     pdf_to_excel(input_pdf_path)
+
+app = Flask(__name__)
+
+# Configure upload folder
+UPLOAD_FOLDER = tempfile.mkdtemp()
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Toolkit</title>
+</head>
+<body>
+    <h1>PDF Toolkit</h1>
+    <form action="/process" method="post" enctype="multipart/form-data">
+        <label for="action">Choose Action:</label>
+        <select id="action" name="action" required>
+            <option value="pdf_to_excel">PDF to Excel</option>
+            <option value="split_pdf">Split PDF</option>
+            <option value="merge_pdfs">Merge PDFs</option>
+            <option value="pdf_to_word">PDF to Word</option>
+            <option value="pdf_to_images">PDF to Images</option>
+        </select>
+
+        <br><br>
+
+        <label for="file">Choose File(s):</label>
+        <input type="file" id="file" name="file" multiple>
+
+        <br><br>
+
+        <label for="additional_input">Additional Input (if needed):</label>
+        <input type="text" id="additional_input" name="additional_input">
+
+        <br><br>
+
+        <button type="submit">Process</button>
+    </form>
+</body>
+</html>
+"""
+
+@app.route('/')
+def home():
+    return render_template_string(HTML_TEMPLATE)
+
+@app.route('/process', methods=['POST'])
+def process():
+    action = request.form.get('action')
+    additional_input = request.form.get('additional_input')
+    files = request.files.getlist('file')
+
+    if not action or not files:
+        return "Invalid input. Please select an action and upload files.", 400
+
+    # Save uploaded files temporarily
+    input_files = []
+    for file in files:
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
+        file.save(file_path)
+        input_files.append(file_path)
+
+    try:
+        if action == 'pdf_to_excel':
+            pdf_to_excel(input_files[0])
+            output_file = input_files[0].replace('.pdf', '.xlsx')
+        elif action == 'split_pdf':
+            if not additional_input:
+                return "Page ranges are required for splitting PDFs.", 400
+            output_file = os.path.join(app.config['UPLOAD_FOLDER'], 'split_output.pdf')
+            split_pdf(input_files[0], additional_input.split(','), output_file)
+        elif action == 'merge_pdfs':
+            output_file = os.path.join(app.config['UPLOAD_FOLDER'], 'merged_output.pdf')
+            merge_pdf_files(output_file, all_files=False)
+        elif action == 'pdf_to_word':
+            pdf_to_word(input_files)
+            output_file = input_files[0].replace('.pdf', '.docx')
+        elif action == 'pdf_to_images':
+            pdf_to_images(input_files)
+            output_file = os.path.join(app.config['UPLOAD_FOLDER'], 'page_1.jpg')
+        else:
+            return "Invalid action.", 400
+
+        return send_file(output_file, as_attachment=True)
+
+    except Exception as e:
+        return f"An error occurred: {str(e)}", 500
+
+if __name__ == '__main__':
+    app.run(debug=True)
